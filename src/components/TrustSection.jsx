@@ -66,7 +66,7 @@ export default function TrustSection() {
         <p className="mt-3 text-xs text-slate-500">
           Built for MPYC volunteers.{' '}
           <a
-            href="https://github.com/mpyc/racesync"
+            href="https://github.com/alamarcinek/mpyc-racesync"
             target="_blank"
             rel="noreferrer"
             className="text-navy underline hover:no-underline"

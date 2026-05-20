@@ -31,7 +31,7 @@ A free tool for [Mount Pleasant Yacht Club](https://mpyc.org.uk) race officers. 
 ### Setup
 
 ```bash
-git clone https://github.com/mpyc/racesync
+git clone https://github.com/alamarcinek/mpyc-racesync
 cd racesync
 npm install
 ```
@@ -62,7 +62,7 @@ The app opens at `http://localhost:3000` (vercel dev) or `http://localhost:5173`
 
 ### One-click deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/mpyc/racesync)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/alamarcinek/mpyc-racesync)
 
 ### Manual deploy
 

@@ -12,7 +12,7 @@ export default function Header() {
           </div>
         </div>
         <a
-          href="https://github.com/mpyc/racesync"
+          href="https://github.com/alamarcinek/mpyc-racesync"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-2 text-white/70 hover:text-white transition text-sm font-medium shrink-0 py-2 px-1"
