@@ -27,14 +27,15 @@ function generateCompetitorsCSV(results, metadata) {
 
 function generateResultsCSV(results, metadata) {
   const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const race = metadata.raceNumber || '1'
+  const baseRace = parseInt(metadata.raceNumber, 10) || 1
   const series = metadata.seriesName ? ` — ${metadata.seriesName}` : ''
 
   const lines = [
     '; MPYC RaceSync Export',
     `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-    `; Race ${race}${series} · ${date}`,
+    `; Starting race number: ${baseRace}${series} · ${date}`,
     `; Gun Start: ${metadata.gunTime || 'not recorded'}`,
+    `; race_section 1 → race ${baseRace} · race_section 2 → race ${baseRace + 1}`,
     '; Mount Pleasant Yacht Club',
     'raceno,sailno,elapsed,code',
   ]
@@ -42,9 +43,11 @@ function generateResultsCSV(results, metadata) {
   for (const r of results) {
     const sn = (r.sailno || '').trim()
     if (!sn) continue
+    const section = parseInt(r.race_section, 10) || 1
+    const raceno = baseRace + (section - 1)
     const code = (r.code || '').trim()
     const elapsed = code ? '' : (r.finish_time || '').trim()
-    lines.push(`${race},${sn},${elapsed},${code}`)
+    lines.push(`${raceno},${sn},${elapsed},${code}`)
   }
   return lines.join('\n')
 }
@@ -64,13 +67,17 @@ function downloadCSV(content, filename) {
 export default function ExportPanel({ results, metadata }) {
   const [preview, setPreview] = useState(null)
 
-  const race = metadata.raceNumber || 'race'
+  const baseRace = parseInt(metadata.raceNumber, 10) || 1
   const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const competitorsFile = `competitors-race${race}-${date}.csv`
-  const resultsFile = `results-race${race}-${date}.csv`
+  const competitorsFile = `competitors-race${baseRace}-${date}.csv`
+  const resultsFile = `results-race${baseRace}-${date}.csv`
 
   const competitorsCSV = generateCompetitorsCSV(results, metadata)
   const resultsCSV = generateResultsCSV(results, metadata)
+
+  const hasSection2 = results.some((r) => parseInt(r.race_section, 10) === 2)
+  const section1Count = results.filter((r) => (parseInt(r.race_section, 10) || 1) === 1 && r.sailno).length
+  const section2Count = results.filter((r) => parseInt(r.race_section, 10) === 2 && r.sailno).length
 
   const downloadBoth = () => {
     downloadCSV(competitorsCSV, competitorsFile)
@@ -88,6 +95,34 @@ export default function ExportPanel({ results, metadata }) {
         </p>
       </div>
 
+      {/* Race section mapping info */}
+      <div className="bg-navy-light border border-navy-border rounded-xl px-4 py-3 text-sm">
+        <p className="font-semibold text-navy mb-1.5">Race numbering in the CSV</p>
+        <div className="space-y-1 text-slate-600">
+          <p>
+            <span className="font-medium">Race section 1</span> (above wavy line)
+            {' → '}
+            <span className="font-mono font-semibold text-navy">raceno {baseRace}</span>
+            {section1Count > 0 && <span className="text-slate-400 ml-1">· {section1Count} results</span>}
+          </p>
+          {hasSection2 ? (
+            <p>
+              <span className="font-medium">Race section 2</span> (below wavy line)
+              {' → '}
+              <span className="font-mono font-semibold text-navy">raceno {baseRace + 1}</span>
+              {section2Count > 0 && <span className="text-slate-400 ml-1">· {section2Count} results</span>}
+            </p>
+          ) : (
+            <p className="text-slate-400 italic">No race section 2 detected on this sheet.</p>
+          )}
+        </div>
+        {!metadata.raceNumber && (
+          <p className="text-amber-600 mt-2 text-xs">
+            Tip: set a Race Number above to control the starting race number.
+          </p>
+        )}
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-4">
         <ExportCard
           title="Competitors CSV"
@@ -100,7 +135,7 @@ export default function ExportPanel({ results, metadata }) {
         <ExportCard
           title="Results CSV"
           subtitle={`${results.filter((r) => r.sailno).length} results`}
-          description="Contains finishing times and race codes for this race."
+          description={hasSection2 ? `Races ${baseRace} and ${baseRace + 1} combined.` : `Race ${baseRace} results.`}
           filename={resultsFile}
           onPreview={() => setPreview({ title: 'Results CSV', content: resultsCSV })}
           onDownload={() => downloadCSV(resultsCSV, resultsFile)}

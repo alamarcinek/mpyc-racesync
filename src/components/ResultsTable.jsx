@@ -3,20 +3,20 @@ const isUncertain = (v) => String(v ?? '').includes('[?]')
 
 const CODE_OPTIONS = ['', 'DNF', 'DNS', 'OCS', 'DSQ', 'RET']
 
-const EMPTY_ROW = (fleet = 'A') => ({
+const EMPTY_ROW = (race_section = 1) => ({
   id: uid(),
   place: '',
   sailno: '',
   finish_time: '',
   code: '',
   notes: '',
-  fleet,
+  race_section,
 })
 
 export default function ResultsTable({ image, results, onResultsChange }) {
   const addRow = () => {
-    const lastFleet = results[results.length - 1]?.fleet || 'A'
-    onResultsChange([...results, EMPTY_ROW(lastFleet)])
+    const lastSection = results[results.length - 1]?.race_section || 1
+    onResultsChange([...results, EMPTY_ROW(lastSection)])
   }
 
   const deleteRow = (id) => onResultsChange(results.filter((r) => r.id !== id))
@@ -70,7 +70,7 @@ export default function ResultsTable({ image, results, onResultsChange }) {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-y border-slate-200">
-                {['Place', 'Sail No', 'Finish Time', 'Code', 'Notes', 'Fleet', ''].map((h) => (
+                {['Place', 'Sail No', 'Finish Time', 'Code', 'Notes', 'Race §', ''].map((h) => (
                   <th
                     key={h}
                     className="px-3 py-2.5 text-left font-semibold text-slate-500 whitespace-nowrap text-xs uppercase tracking-wider"
@@ -134,7 +134,7 @@ function ResultRow({ row, onUpdate, onDelete, onDuplicate }) {
       </td>
 
       <EditCell value={row.notes} onChange={(v) => onUpdate('notes', v)} width="w-40" wide />
-      <EditCell value={row.fleet} onChange={(v) => onUpdate('fleet', v)} width="w-14" />
+      <EditCell value={row.race_section} onChange={(v) => onUpdate('race_section', v)} width="w-14" />
 
       {/* Actions */}
       <td className="px-2 py-1.5">

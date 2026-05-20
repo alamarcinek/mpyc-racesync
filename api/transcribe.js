@@ -3,15 +3,15 @@ import Anthropic from '@anthropic-ai/sdk';
 const PROMPT =
   'You are transcribing a handwritten yacht race finishing times sheet from Mount Pleasant Yacht Club. ' +
   'The sheet has columns: Place, Class (sail number), Finishing Time, Skipper. ' +
-  'Multiple fleets may be on one sheet, separated by wavy lines drawn through empty rows — ' +
-  'when you see this, the place numbers reset for a new fleet. ' +
+  'A single sheet may contain TWO separate races, divided by wavy lines drawn through empty rows. ' +
+  'When you see wavy lines, the place numbers reset because a NEW race begins below. ' +
   'Extract ALL rows containing data and return ONLY a JSON array (no markdown, no explanation). ' +
   'Each object must have: place (integer), sailno (string, keep exactly as written), ' +
-  'finish_time (string in MM:SS format — convert \'29 34\' to \'29:34\'), ' +
-  'code (string — DNF/DNS/OCS/DSQ/RET or empty), notes (string or empty), ' +
-  'fleet (string — \'A\' for first fleet on sheet, \'B\' for second). ' +
+  'finish_time (string in MM:SS format - convert \'29 34\' to \'29:34\'), ' +
+  'code (string - DNF/DNS/OCS/DSQ/RET or empty), notes (string or empty), ' +
+  'race_section (integer: 1 for the first race on the sheet, 2 for the second race below the wavy line). ' +
   'If a value is unclear, append [?]. ' +
-  'Ignore decorative wavy lines themselves — they only signal a fleet break.';
+  'Ignore decorative wavy lines themselves - they only signal a race break.';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
