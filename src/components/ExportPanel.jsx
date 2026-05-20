@@ -12,9 +12,9 @@ const csvField = (v) => {
 
 // ─── CSV generators ────────────────────────────────────────────────────────────
 
-function buildResultsCSV(raceResults, metadata) {
+// races = [{ raceno, rows }] — already computed sequentially in App.jsx
+function buildResultsCSV(races, metadata) {
   const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const baseRace = parseInt(metadata.raceNumber, 10) || 1
   const event = [metadata.seriesName, metadata.raceNumber ? `Race ${metadata.raceNumber}` : ''].filter(Boolean).join(' · ') || 'MPYC'
 
   const lines = [
@@ -25,22 +25,14 @@ function buildResultsCSV(raceResults, metadata) {
     `raceno,sailno,elapsed,code`,
   ]
 
-  // Group rows by race_section, output each as a labelled block
-  const sections = {}
-  for (const r of raceResults) {
-    const s = parseInt(r.race_section, 10) || 1
-    ;(sections[s] = sections[s] || []).push(r)
-  }
-
-  for (const s of Object.keys(sections).map(Number).sort()) {
-    const raceno = baseRace + (s - 1)
-    lines.push(`; ---- Race ${raceno} ----`)
-    for (const r of sections[s]) {
+  for (const race of races) {
+    lines.push(`; ---- Race ${race.raceno} ----`)
+    for (const r of race.rows) {
       const sn = csvField(r.sailno)
       if (!sn) continue
       const code = strip(r.code || '')
       const elapsed = code ? '' : strip(r.finish_time || '')
-      lines.push(`${raceno},${sn},${elapsed},${code}`)
+      lines.push(`${race.raceno},${sn},${elapsed},${code}`)
     }
   }
 
@@ -93,9 +85,10 @@ function downloadCSV(content, filename) {
 
 // ─── Validation ────────────────────────────────────────────────────────────────
 
-function validate(raceResults) {
+function validate(races) {
   const warnings = []
-  const bothTimeAndCode = raceResults.filter((r) => strip(r.finish_time) && strip(r.code))
+  const allRows = races.flatMap((race) => race.rows)
+  const bothTimeAndCode = allRows.filter((r) => strip(r.finish_time) && strip(r.code))
   if (bothTimeAndCode.length > 0) {
     warnings.push(
       `${bothTimeAndCode.length} row${bothTimeAndCode.length > 1 ? 's have' : ' has'} both a finishing time and a code (e.g. DNF). ` +
@@ -107,27 +100,27 @@ function validate(raceResults) {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export default function ExportPanel({ entryResults, raceResults, metadata }) {
+// races = [{ raceno, rows }] from App.jsx computeRaces()
+export default function ExportPanel({ races, entryResults, metadata }) {
   const [showResultsPreview, setShowResultsPreview] = useState(false)
   const [showCompetitorsPreview, setShowCompetitorsPreview] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
 
-  const baseRace = parseInt(metadata.raceNumber, 10) || 1
   const date = metadata.date || new Date().toISOString().slice(0, 10)
+  const allRaceRows = races.flatMap((r) => r.rows)
 
-  const hasSection2 = raceResults.some((r) => parseInt(r.race_section, 10) === 2)
-  const raceLabel = hasSection2 ? `Race${baseRace}-${baseRace + 1}` : `Race${baseRace}`
+  const raceLabel = races.length > 1
+    ? `Race${races[0].raceno}-${races[races.length - 1].raceno}`
+    : races.length === 1 ? `Race${races[0].raceno}` : 'Races'
   const resultsFile = `MPYC_${raceLabel}_Results_${date}.csv`
   const competitorsFile = `MPYC_Competitors_${date}.csv`
 
-  const resultsCSV = buildResultsCSV(raceResults, metadata)
-  const competitorsCSV = buildCompetitorsCSV(entryResults, raceResults, metadata)
+  const resultsCSV = buildResultsCSV(races, metadata)
+  const competitorsCSV = buildCompetitorsCSV(entryResults, allRaceRows, metadata)
 
-  const warnings = validate(raceResults)
+  const warnings = validate(races)
 
-  const uniqueBoats = new Set(raceResults.map((r) => strip(r.sailno)).filter(Boolean)).size
-  const s1Count = raceResults.filter((r) => (parseInt(r.race_section, 10) || 1) === 1 && strip(r.sailno)).length
-  const s2Count = raceResults.filter((r) => parseInt(r.race_section, 10) === 2 && strip(r.sailno)).length
+  const uniqueBoats = new Set(allRaceRows.map((r) => strip(r.sailno)).filter(Boolean)).size
 
   return (
     <div className="card space-y-5">
@@ -151,15 +144,19 @@ export default function ExportPanel({ entryResults, raceResults, metadata }) {
       )}
 
       {/* Race numbering info */}
-      {raceResults.length > 0 && (
+      {races.length > 0 && (
         <div className="bg-navy-light border border-navy-border rounded-xl px-4 py-3 text-sm">
           <p className="font-semibold text-navy mb-1.5">Race numbers in Results CSV</p>
           <div className="space-y-1 text-slate-600 text-sm">
-            <p>Race {baseRace}: <span className="text-slate-400 text-xs">{s1Count} results</span></p>
-            {hasSection2
-              ? <p>Race {baseRace + 1}: <span className="text-slate-400 text-xs">{s2Count} results</span></p>
-              : <p className="text-slate-400 italic text-xs">No second race detected on these sheets.</p>
-            }
+            {races.map((race) => (
+              <p key={race.raceno}>
+                Race {race.raceno}:{' '}
+                <span className="text-slate-400 text-xs">
+                  {race.rows.filter((r) => strip(r.sailno)).length} results
+                  {' · '}{race.imageName}
+                </span>
+              </p>
+            ))}
           </div>
           {!metadata.raceNumber && (
             <p className="text-amber-600 mt-2 text-xs font-medium">↑ Set Race Number above to control the starting number.</p>
@@ -168,10 +165,10 @@ export default function ExportPanel({ entryResults, raceResults, metadata }) {
       )}
 
       {/* Results CSV */}
-      {raceResults.length > 0 && (
+      {races.length > 0 && (
         <ExportSection
           title="Results CSV"
-          subtitle={`${raceResults.filter((r) => strip(r.sailno)).length} results · ${hasSection2 ? `Races ${baseRace} & ${baseRace + 1}` : `Race ${baseRace}`}`}
+          subtitle={`${allRaceRows.filter((r) => strip(r.sailno)).length} results · ${races.length} race${races.length > 1 ? 's' : ''}`}
           filename={resultsFile}
           csv={resultsCSV}
           showPreview={showResultsPreview}

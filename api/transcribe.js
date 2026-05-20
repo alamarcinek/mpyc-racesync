@@ -3,25 +3,27 @@ import Anthropic from '@anthropic-ai/sdk';
 const PROMPT =
   'You are processing a Mount Pleasant Yacht Club paper sheet. ' +
   'First identify the sheet type from the column headers and content:\n' +
-  '- ENTRY FORM: columns like "Club", "Yacht Name", "Type of yacht", "Skipper & Crew", "Number" — registers competitors\n' +
-  '- RACE RESULTS: columns like "Place", "Class", "Finishing Time" — records finishing order\n\n' +
+  '- ENTRY FORM: columns like "Club", "Yacht Name", "Type of yacht", "Skipper & Crew", "Number"\n' +
+  '- RACE RESULTS: columns like "Place", "Class", "Finishing Time"\n\n' +
   'Return a single JSON object (no markdown, no explanation) with exactly two fields: "sheet_type" and "rows".\n\n' +
   'If sheet_type is "entry", each row in "rows" must have:\n' +
-  '  club (string), yacht_name (string), yacht_type (string), sail_size (string), skipper (string), sailno (string — the Number column).\n' +
+  '  club, yacht_name, yacht_type, sail_size, skipper, sailno (the Number column).\n' +
   '  Skip the printed example row and blank rows.\n\n' +
   'If sheet_type is "results", each row in "rows" must have:\n' +
-  '  place (integer — handwritten Place value only; ignore the pre-printed row numbers 1-33 on the left sheet edge),\n' +
-  '  sailno (string — from the "Class" column; despite the heading "Class", this column contains the sail/race NUMBER, not a boat class. Keep spaces e.g. "116 033"),\n' +
-  '  finish_time (string MM:SS — convert "29 10" or "29.10" to "29:10"),\n' +
+  '  place (integer — handwritten place value only; IGNORE the pre-printed row numbers 1-33 along the left edge of the sheet, those are sheet row numbers not place numbers),\n' +
+  '  sailno (string — from the "Class" column; despite the label "Class" this column contains the sail/race NUMBER. Keep spaces e.g. "116 033"),\n' +
+  '  finish_time (string MM:SS — convert "29 10" or "29.10" to "29:10". LEAVE BLANK if there is a code such as DNF),\n' +
   '  skipper (string or empty),\n' +
-  '  code (string — DNF/DNS/OCS/DSQ/RET or empty),\n' +
+  '  code (string — DNF/DNS/OCS/DSQ/RET or empty. If a row has a code, finish_time must be empty),\n' +
   '  notes (string or empty),\n' +
-  '  race_section (integer: 1 for rows belonging to the first race, 2 for rows belonging to the second race).\n\n' +
-  '  IMPORTANT for race_section: a single sheet frequently contains TWO separate races. ' +
-  '  Signs that a second race begins: (1) blank empty rows creating a gap, (2) a wavy or zigzag line drawn through empty rows, ' +
-  '  (3) the same sail numbers reappear below the gap with completely different finishing times. ' +
-  '  Any one of these signs, especially the repeating sail numbers, means race_section changes from 1 to 2. ' +
-  '  Place numbers reset to 1 when the second race starts.\n\n' +
+  '  race_section (integer: 1 for the first race, 2 for the second race on the same sheet).\n\n' +
+  '  PLACE NUMBERING RULE: Place numbers ALWAYS start at 1 for each race section. ' +
+  '  In race_section 2 the first finisher is place 1, second is place 2, etc. ' +
+  '  Do NOT carry over place numbers from race_section 1 into race_section 2.\n\n' +
+  '  RACE BOUNDARY DETECTION: A sheet often has TWO races. Signs a second race begins: ' +
+  '  (1) blank/empty rows creating a visual gap, (2) a wavy or zigzag line drawn across empty rows, ' +
+  '  (3) the same sail numbers reappear below with completely different finishing times. ' +
+  '  Any of these signals means subsequent rows belong to race_section 2.\n\n' +
   'If any value is unclear, append [?]. Skip entirely blank rows.';
 
 export default async function handler(req, res) {
@@ -57,13 +59,11 @@ export default async function handler(req, res) {
     });
 
     let text = message.content[0].text.trim();
-
     if (text.startsWith('```')) {
       text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     }
 
     const parsed = JSON.parse(text);
-
     if (!parsed.sheet_type || !Array.isArray(parsed.rows)) {
       throw new Error('Unexpected response format from AI');
     }
@@ -74,22 +74,14 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('Transcription error:', err);
-
     if (err instanceof SyntaxError) {
-      return res.status(422).json({
-        error: 'Could not parse the AI response. Try a clearer or higher-resolution photo.',
-      });
+      return res.status(422).json({ error: 'Could not parse the AI response. Try a clearer or higher-resolution photo.' });
     }
-    if (err.status === 401) {
-      return res.status(500).json({ error: 'API authentication failed. Contact the site admin.' });
-    }
-    if (err.status === 429) {
-      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' });
-    }
+    if (err.status === 401) return res.status(500).json({ error: 'API authentication failed. Contact the site admin.' });
+    if (err.status === 429) return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' });
     if (err.status === 413 || (err.message && err.message.includes('too large'))) {
       return res.status(413).json({ error: 'Image is too large. Please resize it below 4 MB and try again.' });
     }
-
     return res.status(500).json({ error: err.message || 'Transcription failed. Please try again.' });
   }
 }
