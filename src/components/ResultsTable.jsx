@@ -13,13 +13,9 @@ const EMPTY_ENTRY_ROW = () => ({
 
 export default function ResultsTable({ image, results, metadata, onResultsChange }) {
   if (image.sheetType === 'entry') {
-    return (
-      <EntryTable image={image} results={results} onResultsChange={onResultsChange} />
-    )
+    return <EntryTable image={image} results={results} onResultsChange={onResultsChange} />
   }
-  return (
-    <RaceResultsTable image={image} results={results} metadata={metadata} onResultsChange={onResultsChange} />
-  )
+  return <RaceResultsTable image={image} results={results} metadata={metadata} onResultsChange={onResultsChange} />
 }
 
 // ─── Entry Form Table ──────────────────────────────────────────────────────────
@@ -36,7 +32,6 @@ function EntryTable({ image, results, onResultsChange }) {
   }
   const updateCell = (id, field, value) =>
     onResultsChange(results.map((r) => (r.id === id ? { ...r, [field]: value } : r)))
-
   const uncertainCount = results.filter((r) => Object.values(r).some(isUncertain)).length
 
   return (
@@ -50,16 +45,13 @@ function EntryTable({ image, results, onResultsChange }) {
         label="competitor"
         error={image.status === 'error' ? image.error : null}
       />
-
       {image.status !== 'error' && results.length > 0 && (
         <div className="overflow-x-auto -mx-5 sm:-mx-6">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-y border-slate-200">
                 {['Club', 'Yacht Name', 'Type', 'Sail Size', 'Skipper & Crew', 'Sail No', ''].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -72,17 +64,13 @@ function EntryTable({ image, results, onResultsChange }) {
                   <EditCell value={row.sail_size}  onChange={(v) => updateCell(row.id, 'sail_size', v)}  width="w-20" />
                   <EditCell value={row.skipper}    onChange={(v) => updateCell(row.id, 'skipper', v)}    width="w-40" wide />
                   <EditCell value={row.sailno}     onChange={(v) => updateCell(row.id, 'sailno', v)}     width="w-24" />
-                  <ActionCell
-                    onDuplicate={() => duplicateRow(row.id)}
-                    onDelete={() => deleteRow(row.id)}
-                  />
+                  <ActionCell onDuplicate={() => duplicateRow(row.id)} onDelete={() => deleteRow(row.id)} />
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-
       <div className="mt-4 pt-4 border-t border-slate-100">
         <button onClick={addRow} className="btn-ghost">+ Add Row</button>
       </div>
@@ -95,9 +83,6 @@ function EntryTable({ image, results, onResultsChange }) {
 function RaceResultsTable({ image, results, metadata, onResultsChange }) {
   const baseRace = parseInt(metadata?.raceNumber, 10) || 1
 
-  const addRow = (race_section) => {
-    onResultsChange([...results, EMPTY_RESULTS_ROW(race_section)])
-  }
   const deleteRow = (id) => onResultsChange(results.filter((r) => r.id !== id))
   const duplicateRow = (id) => {
     const idx = results.findIndex((r) => r.id === id)
@@ -108,6 +93,8 @@ function RaceResultsTable({ image, results, metadata, onResultsChange }) {
   }
   const updateCell = (id, field, value) =>
     onResultsChange(results.map((r) => (r.id === id ? { ...r, [field]: value } : r)))
+  const addRow = (race_section) =>
+    onResultsChange([...results, EMPTY_RESULTS_ROW(race_section)])
 
   const section1 = results.filter((r) => (parseInt(r.race_section, 10) || 1) === 1)
   const section2 = results.filter((r) => parseInt(r.race_section, 10) === 2)
@@ -115,7 +102,7 @@ function RaceResultsTable({ image, results, metadata, onResultsChange }) {
   const uncertainCount = results.filter((r) => Object.values(r).some(isUncertain)).length
 
   return (
-    <div className="card">
+    <div className="card space-y-0">
       <TableHeader
         title={image.name}
         badge="Race Results"
@@ -127,7 +114,7 @@ function RaceResultsTable({ image, results, metadata, onResultsChange }) {
       />
 
       {image.status !== 'error' && (
-        <>
+        <div className="space-y-6">
           {/* Race section 1 */}
           <RaceSection
             label={`Race ${baseRace}`}
@@ -138,35 +125,30 @@ function RaceResultsTable({ image, results, metadata, onResultsChange }) {
             onAddRow={() => addRow(1)}
           />
 
-          {/* Zigzag divider */}
+          {/* Race section 2 — separate table, no zigzag */}
           {hasSection2 && (
-            <ZigZagDivider label={`Race ${baseRace + 1} begins`} />
-          )}
-
-          {/* Race section 2 */}
-          {hasSection2 && (
-            <RaceSection
-              label={`Race ${baseRace + 1}`}
-              rows={section2}
-              onUpdate={updateCell}
-              onDelete={deleteRow}
-              onDuplicate={duplicateRow}
-              onAddRow={() => addRow(2)}
-            />
+            <>
+              <div className="border-t-2 border-slate-200 pt-5">
+                <RaceSection
+                  label={`Race ${baseRace + 1}`}
+                  rows={section2}
+                  onUpdate={updateCell}
+                  onDelete={deleteRow}
+                  onDuplicate={duplicateRow}
+                  onAddRow={() => addRow(2)}
+                />
+              </div>
+            </>
           )}
 
           {!hasSection2 && (
-            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3 flex-wrap">
-              <button onClick={() => addRow(1)} className="btn-ghost">+ Add Row (Race {baseRace})</button>
-              <button
-                onClick={() => onResultsChange([...results, EMPTY_RESULTS_ROW(2)])}
-                className="btn-ghost text-slate-400"
-              >
+            <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-slate-100">
+              <button onClick={() => addRow(2)} className="btn-ghost text-slate-400 text-sm">
                 + Add Race {baseRace + 1}
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
@@ -177,19 +159,16 @@ function RaceSection({ label, rows, onUpdate, onDelete, onDuplicate, onAddRow })
 
   return (
     <div>
-      {/* Section header — mimics the paper's "Race 3" label */}
-      <div className="flex items-center justify-between mb-2 mt-1">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-navy text-sm px-3 py-1 bg-navy-light rounded-lg">{label}</span>
-          <span className="text-xs text-slate-500">
-            {rows.length} entr{rows.length === 1 ? 'y' : 'ies'}
-            {uncertainCount > 0 && (
-              <span className="ml-1.5 text-amber-600 font-medium">
-                · {uncertainCount} <span className="bg-yellow-200 text-amber-800 rounded px-1">?</span>
-              </span>
-            )}
-          </span>
-        </div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="font-bold text-white text-sm px-3 py-1 bg-navy rounded-lg">{label}</span>
+        <span className="text-xs text-slate-500">
+          {rows.length} entr{rows.length === 1 ? 'y' : 'ies'}
+          {uncertainCount > 0 && (
+            <span className="ml-1.5 text-amber-600 font-medium">
+              · {uncertainCount} <span className="bg-yellow-200 text-amber-800 rounded px-1">?</span>
+            </span>
+          )}
+        </span>
       </div>
 
       {rows.length > 0 ? (
@@ -197,10 +176,8 @@ function RaceSection({ label, rows, onUpdate, onDelete, onDuplicate, onAddRow })
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-y border-slate-200">
-                {['Place', 'Class', 'Finishing Time', 'Skipper', 'Code', 'Notes', ''].map((h) => (
-                  <th key={h} className="px-3 py-2 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
+                {['Place', 'Sail No', 'Finishing Time', 'Skipper', 'Code', 'Notes', ''].map((h) => (
+                  <th key={h} className="px-3 py-2 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -211,7 +188,6 @@ function RaceSection({ label, rows, onUpdate, onDelete, onDuplicate, onAddRow })
                   <EditCell value={row.sailno}      onChange={(v) => onUpdate(row.id, 'sailno', v)}      width="w-28" />
                   <EditCell value={row.finish_time} onChange={(v) => onUpdate(row.id, 'finish_time', v)} width="w-28" placeholder="26:17" />
                   <EditCell value={row.skipper}     onChange={(v) => onUpdate(row.id, 'skipper', v)}     width="w-32" wide />
-                  {/* Code select */}
                   <td className={`px-2 py-1.5 ${isUncertain(row.code) ? 'bg-yellow-50' : ''}`}>
                     <select
                       value={row.code}
@@ -229,7 +205,7 @@ function RaceSection({ label, rows, onUpdate, onDelete, onDuplicate, onAddRow })
           </table>
         </div>
       ) : (
-        <p className="text-slate-400 text-sm py-3 text-center border border-dashed border-slate-200 rounded-lg">No entries yet</p>
+        <p className="text-slate-400 text-sm py-3 text-center border border-dashed border-slate-200 rounded-lg">No entries</p>
       )}
 
       <div className="mt-3">
@@ -239,7 +215,7 @@ function RaceSection({ label, rows, onUpdate, onDelete, onDuplicate, onAddRow })
   )
 }
 
-// ─── Shared sub-components ─────────────────────────────────────────────────────
+// ─── Shared ────────────────────────────────────────────────────────────────────
 
 function TableHeader({ title, badge, badgeStyle, count, uncertainCount, label, error }) {
   return (
@@ -263,24 +239,6 @@ function TableHeader({ title, badge, badgeStyle, count, uncertainCount, label, e
           </p>
         )}
       </div>
-    </div>
-  )
-}
-
-function ZigZagDivider({ label }) {
-  return (
-    <div className="flex items-center gap-3 py-4 my-2">
-      <svg width="72" height="18" viewBox="0 0 72 18" fill="none" className="text-slate-300 shrink-0">
-        <polyline points="0,14 12,4 24,14 36,4 48,14 60,4 72,14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-      <div className="flex-1 border-t border-dashed border-slate-300" />
-      <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full shrink-0 whitespace-nowrap">
-        {label}
-      </span>
-      <div className="flex-1 border-t border-dashed border-slate-300" />
-      <svg width="72" height="18" viewBox="0 0 72 18" fill="none" className="text-slate-300 shrink-0">
-        <polyline points="0,14 12,4 24,14 36,4 48,14 60,4 72,14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
     </div>
   )
 }
@@ -310,13 +268,9 @@ function ActionCell({ onDuplicate, onDelete }) {
     <td className="px-2 py-1.5">
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 sm:opacity-100 transition-opacity">
         <button onClick={onDuplicate} title="Duplicate row" aria-label="Duplicate row"
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
-          ⊕
-        </button>
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">⊕</button>
         <button onClick={onDelete} title="Delete row" aria-label="Delete row"
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-red-400 hover:bg-red-50 hover:text-red-600 transition">
-          ✕
-        </button>
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-red-400 hover:bg-red-50 hover:text-red-600 transition">✕</button>
       </div>
     </td>
   )

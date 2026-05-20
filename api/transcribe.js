@@ -8,17 +8,20 @@ const PROMPT =
   'Return a single JSON object (no markdown, no explanation) with exactly two fields: "sheet_type" and "rows".\n\n' +
   'If sheet_type is "entry", each row in "rows" must have:\n' +
   '  club (string), yacht_name (string), yacht_type (string), sail_size (string), skipper (string), sailno (string — the Number column).\n' +
-  '  Skip the printed example row and skip blank rows.\n\n' +
+  '  Skip the printed example row and blank rows.\n\n' +
   'If sheet_type is "results", each row in "rows" must have:\n' +
-  '  place (integer — from the handwritten Place column only; ignore the pre-printed row numbers 1-33 on the left sheet edge),\n' +
-  '  sailno (string, keep spaces e.g. "116 033"),\n' +
+  '  place (integer — handwritten Place value only; ignore the pre-printed row numbers 1-33 on the left sheet edge),\n' +
+  '  sailno (string — from the "Class" column; despite the heading "Class", this column contains the sail/race NUMBER, not a boat class. Keep spaces e.g. "116 033"),\n' +
   '  finish_time (string MM:SS — convert "29 10" or "29.10" to "29:10"),\n' +
   '  skipper (string or empty),\n' +
   '  code (string — DNF/DNS/OCS/DSQ/RET or empty),\n' +
   '  notes (string or empty),\n' +
-  '  race_section (integer: 1 for rows before the zigzag line, 2 for rows after).\n' +
-  '  Note: a results sheet often has TWO races separated by a wavy zigzag line through empty rows. ' +
-  '  After the zigzag the same sail numbers reappear with new times. Place numbers reset to 1 in section 2.\n\n' +
+  '  race_section (integer: 1 for rows belonging to the first race, 2 for rows belonging to the second race).\n\n' +
+  '  IMPORTANT for race_section: a single sheet frequently contains TWO separate races. ' +
+  '  Signs that a second race begins: (1) blank empty rows creating a gap, (2) a wavy or zigzag line drawn through empty rows, ' +
+  '  (3) the same sail numbers reappear below the gap with completely different finishing times. ' +
+  '  Any one of these signs, especially the repeating sail numbers, means race_section changes from 1 to 2. ' +
+  '  Place numbers reset to 1 when the second race starts.\n\n' +
   'If any value is unclear, append [?]. Skip entirely blank rows.';
 
 export default async function handler(req, res) {

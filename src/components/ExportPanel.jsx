@@ -1,71 +1,79 @@
 import { useState } from 'react'
 import { DownloadIcon } from './icons'
 
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+const strip = (v) => String(v ?? '').replace(/\s*\[\?\]/g, '').trim()
+
+const csvField = (v) => {
+  const s = strip(v)
+  return s.includes(',') ? `"${s.replace(/"/g, '""')}"` : s
+}
+
 // ─── CSV generators ────────────────────────────────────────────────────────────
 
-function generateCompetitorsCSV(entryResults, raceResults, metadata) {
+function buildResultsCSV(raceResults, metadata) {
   const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const race = metadata.raceNumber || '?'
-  const series = metadata.seriesName ? ` — ${metadata.seriesName}` : ''
-  const source = entryResults.length > 0 ? 'entry form' : 'race results (no entry form uploaded)'
+  const baseRace = parseInt(metadata.raceNumber, 10) || 1
+  const event = [metadata.seriesName, metadata.raceNumber ? `Race ${metadata.raceNumber}` : ''].filter(Boolean).join(' · ') || 'MPYC'
 
   const lines = [
-    '; MPYC RaceSync Export',
-    `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-    `; Race ${race}${series} · ${date}`,
-    `; Competitors source: ${source}`,
-    '; Mount Pleasant Yacht Club',
-    'SailNo,HelmName,Class,Club',
+    `; MPYC Race Results`,
+    `; Event: ${event}`,
+    `; Date: ${date}`,
+    `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} by MPYC RaceSync`,
+    `raceno,sailno,elapsed,code`,
   ]
 
-  if (entryResults.length > 0) {
-    // Use rich entry form data
-    for (const r of entryResults) {
-      const sn = (r.sailno || '').trim()
+  // Group rows by race_section, output each as a labelled block
+  const sections = {}
+  for (const r of raceResults) {
+    const s = parseInt(r.race_section, 10) || 1
+    ;(sections[s] = sections[s] || []).push(r)
+  }
+
+  for (const s of Object.keys(sections).map(Number).sort()) {
+    const raceno = baseRace + (s - 1)
+    lines.push(`; ---- Race ${raceno} ----`)
+    for (const r of sections[s]) {
+      const sn = csvField(r.sailno)
       if (!sn) continue
-      const helm = (r.skipper || '').replace(/,/g, ' ')
-      const cls = (r.yacht_type || '').replace(/,/g, ' ')
-      const club = (r.club || '').replace(/,/g, ' ')
-      lines.push(`${sn},${helm},${cls},${club}`)
-    }
-  } else {
-    // Fallback: unique sail numbers from race results
-    const seen = new Set()
-    for (const r of raceResults) {
-      const sn = (r.sailno || '').trim()
-      if (sn && !seen.has(sn)) {
-        seen.add(sn)
-        lines.push(`${sn},,,`)
-      }
+      const code = strip(r.code || '')
+      const elapsed = code ? '' : strip(r.finish_time || '')
+      lines.push(`${raceno},${sn},${elapsed},${code}`)
     }
   }
 
   return lines.join('\n')
 }
 
-function generateResultsCSV(raceResults, metadata) {
+function buildCompetitorsCSV(entryResults, raceResults, metadata) {
   const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const baseRace = parseInt(metadata.raceNumber, 10) || 1
-  const series = metadata.seriesName ? ` — ${metadata.seriesName}` : ''
+  const event = metadata.seriesName || 'MPYC'
 
   const lines = [
-    '; MPYC RaceSync Export',
-    `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-    `; Starting race: ${baseRace}${series} · ${date}`,
-    `; Gun Start: ${metadata.gunTime || 'not recorded'}`,
-    `; race_section 1 → raceno ${baseRace} · race_section 2 → raceno ${baseRace + 1}`,
-    '; Mount Pleasant Yacht Club',
-    'raceno,sailno,elapsed,code',
+    `; MPYC Competitor List`,
+    `; Event: ${event}`,
+    `; Date: ${date}`,
+    `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} by MPYC RaceSync`,
+    `SailNo,HelmName,Class,Club`,
   ]
 
-  for (const r of raceResults) {
-    const sn = (r.sailno || '').trim()
-    if (!sn) continue
-    const section = parseInt(r.race_section, 10) || 1
-    const raceno = baseRace + (section - 1)
-    const code = (r.code || '').trim()
-    const elapsed = code ? '' : (r.finish_time || '').trim()
-    lines.push(`${raceno},${sn},${elapsed},${code}`)
+  if (entryResults.length > 0) {
+    for (const r of entryResults) {
+      const sn = csvField(r.sailno)
+      if (!sn) continue
+      lines.push(`${sn},${csvField(r.skipper)},${csvField(r.yacht_type)},${csvField(r.club)}`)
+    }
+  } else {
+    const seen = new Set()
+    for (const r of raceResults) {
+      const sn = csvField(r.sailno)
+      if (sn && !seen.has(sn)) {
+        seen.add(sn)
+        lines.push(`${sn},,,`)
+      }
+    }
   }
 
   return lines.join('\n')
@@ -83,157 +91,161 @@ function downloadCSV(content, filename) {
   URL.revokeObjectURL(url)
 }
 
+// ─── Validation ────────────────────────────────────────────────────────────────
+
+function validate(raceResults) {
+  const warnings = []
+  const bothTimeAndCode = raceResults.filter((r) => strip(r.finish_time) && strip(r.code))
+  if (bothTimeAndCode.length > 0) {
+    warnings.push(
+      `${bothTimeAndCode.length} row${bothTimeAndCode.length > 1 ? 's have' : ' has'} both a finishing time and a code (e.g. DNF). ` +
+      `Sailwave expects one or the other. Sail numbers: ${bothTimeAndCode.map((r) => strip(r.sailno)).join(', ')}.`
+    )
+  }
+  return warnings
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExportPanel({ entryResults, raceResults, metadata }) {
-  const [preview, setPreview] = useState(null)
+  const [showResultsPreview, setShowResultsPreview] = useState(false)
+  const [showCompetitorsPreview, setShowCompetitorsPreview] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(false)
 
   const baseRace = parseInt(metadata.raceNumber, 10) || 1
   const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const competitorsFile = `competitors-race${baseRace}-${date}.csv`
-  const resultsFile = `results-race${baseRace}-${date}.csv`
-
-  const competitorsCSV = generateCompetitorsCSV(entryResults, raceResults, metadata)
-  const resultsCSV = generateResultsCSV(raceResults, metadata)
 
   const hasSection2 = raceResults.some((r) => parseInt(r.race_section, 10) === 2)
-  const section1Count = raceResults.filter((r) => (parseInt(r.race_section, 10) || 1) === 1 && r.sailno).length
-  const section2Count = raceResults.filter((r) => parseInt(r.race_section, 10) === 2 && r.sailno).length
-  const uniqueBoats = new Set(raceResults.map((r) => r.sailno).filter(Boolean)).size
+  const raceLabel = hasSection2 ? `Race${baseRace}-${baseRace + 1}` : `Race${baseRace}`
+  const resultsFile = `MPYC_${raceLabel}_Results_${date}.csv`
+  const competitorsFile = `MPYC_Competitors_${date}.csv`
 
-  const downloadBoth = () => {
-    downloadCSV(competitorsCSV, competitorsFile)
-    setTimeout(() => downloadCSV(resultsCSV, resultsFile), 400)
-  }
+  const resultsCSV = buildResultsCSV(raceResults, metadata)
+  const competitorsCSV = buildCompetitorsCSV(entryResults, raceResults, metadata)
+
+  const warnings = validate(raceResults)
+
+  const uniqueBoats = new Set(raceResults.map((r) => strip(r.sailno)).filter(Boolean)).size
+  const s1Count = raceResults.filter((r) => (parseInt(r.race_section, 10) || 1) === 1 && strip(r.sailno)).length
+  const s2Count = raceResults.filter((r) => parseInt(r.race_section, 10) === 2 && strip(r.sailno)).length
 
   return (
     <div className="card space-y-5">
       <div>
         <h2 className="section-title mb-1">Export to Sailwave</h2>
         <p className="text-sm text-slate-500">
-          Import Competitors first, then Results — via{' '}
-          <span className="font-medium text-slate-700">File → Import → Import results from CSV</span>.
+          Import <strong>Competitors</strong> first, then <strong>Results</strong> — both via{' '}
+          <span className="font-medium text-slate-700">File → Import</span> in Sailwave.
         </p>
       </div>
 
-      {/* Race number mapping */}
+      {/* Validation warnings */}
+      {warnings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
+          <p className="text-sm font-semibold text-amber-800">⚠ Data inconsistencies</p>
+          {warnings.map((w, i) => (
+            <p key={i} className="text-sm text-amber-700">{w}</p>
+          ))}
+          <p className="text-xs text-amber-600 mt-1">Fix these in the tables above before exporting.</p>
+        </div>
+      )}
+
+      {/* Race numbering info */}
       {raceResults.length > 0 && (
         <div className="bg-navy-light border border-navy-border rounded-xl px-4 py-3 text-sm">
-          <p className="font-semibold text-navy mb-2">Race numbering in Results CSV</p>
-          <div className="space-y-1 text-slate-600">
-            <p>
-              <span className="font-medium">Race section 1</span>
-              {' → '}
-              <span className="font-mono font-semibold text-navy">raceno {baseRace}</span>
-              <span className="text-slate-400 ml-1.5 text-xs">· {section1Count} results</span>
-            </p>
-            {hasSection2 ? (
-              <p>
-                <span className="font-medium">Race section 2</span>
-                {' → '}
-                <span className="font-mono font-semibold text-navy">raceno {baseRace + 1}</span>
-                <span className="text-slate-400 ml-1.5 text-xs">· {section2Count} results</span>
-              </p>
-            ) : (
-              <p className="text-slate-400 italic text-xs">No second race section detected on these sheets.</p>
-            )}
+          <p className="font-semibold text-navy mb-1.5">Race numbers in Results CSV</p>
+          <div className="space-y-1 text-slate-600 text-sm">
+            <p>Race {baseRace}: <span className="text-slate-400 text-xs">{s1Count} results</span></p>
+            {hasSection2
+              ? <p>Race {baseRace + 1}: <span className="text-slate-400 text-xs">{s2Count} results</span></p>
+              : <p className="text-slate-400 italic text-xs">No second race detected on these sheets.</p>
+            }
           </div>
           {!metadata.raceNumber && (
-            <p className="text-amber-600 mt-2 text-xs font-medium">
-              ↑ Set a Race Number in the Race Details above to control the starting race number.
-            </p>
+            <p className="text-amber-600 mt-2 text-xs font-medium">↑ Set Race Number above to control the starting number.</p>
           )}
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <ExportCard
-          title="Competitors CSV"
-          subtitle={
-            entryResults.length > 0
-              ? `${entryResults.length} from entry form`
-              : `${uniqueBoats} sail numbers from results`
-          }
-          description={
-            entryResults.length > 0
-              ? 'Built from your entry form — includes names, class, club.'
-              : 'No entry form uploaded — sail numbers only.'
-          }
-          filename={competitorsFile}
-          onPreview={() => setPreview({ title: 'Competitors CSV', content: competitorsCSV })}
-          onDownload={() => downloadCSV(competitorsCSV, competitorsFile)}
-        />
-        <ExportCard
+      {/* Results CSV */}
+      {raceResults.length > 0 && (
+        <ExportSection
           title="Results CSV"
-          subtitle={`${raceResults.filter((r) => r.sailno).length} results${hasSection2 ? ` · ${2} races` : ''}`}
-          description={
-            hasSection2
-              ? `Races ${baseRace} and ${baseRace + 1} combined in one file.`
-              : `Race ${baseRace} results.`
-          }
+          subtitle={`${raceResults.filter((r) => strip(r.sailno)).length} results · ${hasSection2 ? `Races ${baseRace} & ${baseRace + 1}` : `Race ${baseRace}`}`}
           filename={resultsFile}
-          onPreview={() => setPreview({ title: 'Results CSV', content: resultsCSV })}
+          csv={resultsCSV}
+          showPreview={showResultsPreview}
+          onTogglePreview={() => setShowResultsPreview((v) => !v)}
           onDownload={() => downloadCSV(resultsCSV, resultsFile)}
-          disabled={raceResults.length === 0}
         />
-      </div>
-
-      <button onClick={downloadBoth} disabled={raceResults.length === 0} className="btn-primary">
-        <DownloadIcon className="w-5 h-5" />
-        Download Both CSVs
-      </button>
-
-      {/* Preview modal */}
-      {preview && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setPreview(null)}
-        >
-          <div
-            className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
-              <h3 className="font-semibold text-navy">{preview.title}</h3>
-              <button
-                onClick={() => setPreview(null)}
-                aria-label="Close preview"
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition text-lg font-bold"
-              >
-                ×
-              </button>
-            </div>
-            <pre className="p-5 overflow-auto text-xs text-slate-700 font-mono flex-1 bg-slate-50 leading-relaxed whitespace-pre-wrap break-all">
-              {preview.content}
-            </pre>
-          </div>
-        </div>
       )}
+
+      {/* Competitors CSV */}
+      <ExportSection
+        title="Competitors CSV"
+        subtitle={
+          entryResults.length > 0
+            ? `${entryResults.length} from entry form`
+            : `${uniqueBoats} sail numbers from results`
+        }
+        filename={competitorsFile}
+        csv={competitorsCSV}
+        showPreview={showCompetitorsPreview}
+        onTogglePreview={() => setShowCompetitorsPreview((v) => !v)}
+        onDownload={() => downloadCSV(competitorsCSV, competitorsFile)}
+        note={entryResults.length === 0 ? 'No entry form uploaded — helm names and class left blank.' : null}
+      />
+
+      {/* Sailwave instructions */}
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setShowInstructions((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+        >
+          <span>How to import into Sailwave</span>
+          <span className="text-slate-400 text-base">{showInstructions ? '▲' : '▼'}</span>
+        </button>
+        {showInstructions && (
+          <div className="px-4 pb-4 text-sm text-slate-600 space-y-2 border-t border-slate-100 pt-3">
+            <p className="font-medium text-slate-700">Step 1 — Import competitors</p>
+            <p>In Sailwave: <span className="font-mono bg-slate-100 px-1 rounded">File → Import Competitor List</span> → select <code className="bg-slate-100 px-1 rounded">{competitorsFile}</code></p>
+            <p className="font-medium text-slate-700 pt-1">Step 2 — Import results</p>
+            <p>In Sailwave: <span className="font-mono bg-slate-100 px-1 rounded">File → Import Race Results</span> → select <code className="bg-slate-100 px-1 rounded">{resultsFile}</code></p>
+            <p className="text-slate-500 text-xs pt-1">Sailwave will match results to competitors by sail number. Check the scoring view after import.</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function ExportCard({ title, subtitle, description, filename, onPreview, onDownload, disabled }) {
+function ExportSection({ title, subtitle, filename, csv, showPreview, onTogglePreview, onDownload, note }) {
   return (
-    <div className={`border-2 rounded-xl p-4 space-y-3 transition ${disabled ? 'border-slate-100 opacity-50' : 'border-slate-200 hover:border-navy/30'}`}>
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-slate-800">{title}</h3>
-          <span className="text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 shrink-0">
-            {subtitle}
-          </span>
+    <div className="border-2 border-slate-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-slate-800">{title}</span>
+            <span className="text-xs text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">{subtitle}</span>
+          </div>
+          <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">{filename}</p>
+          {note && <p className="text-xs text-amber-600 mt-0.5">{note}</p>}
         </div>
-        <p className="text-sm text-slate-500 mt-0.5">{description}</p>
-        <p className="text-xs text-slate-400 font-mono mt-1 truncate">{filename}</p>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={onTogglePreview} className="btn-secondary text-sm px-3 py-2 min-h-[40px]">
+            {showPreview ? 'Hide' : 'Preview'}
+          </button>
+          <button onClick={onDownload} className="btn-primary text-sm px-3 py-2 min-h-[40px]">
+            <DownloadIcon className="w-4 h-4" />
+            Download
+          </button>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <button onClick={onPreview} disabled={disabled} className="btn-secondary text-sm px-4 py-2 min-h-[40px]">
-          Preview
-        </button>
-        <button onClick={onDownload} disabled={disabled} className="btn-primary text-sm px-4 py-2 min-h-[40px]">
-          Download
-        </button>
-      </div>
+      {showPreview && (
+        <pre className="border-t border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 font-mono overflow-auto max-h-64 leading-relaxed whitespace-pre">
+          {csv}
+        </pre>
+      )}
     </div>
   )
 }
