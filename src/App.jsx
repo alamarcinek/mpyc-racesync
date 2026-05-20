@@ -27,17 +27,17 @@ export default function App() {
 
   const [images, setImages] = useState([])
   const imagesRef = useRef([])
-  useEffect(() => {
-    imagesRef.current = images
-  }, [images])
+  useEffect(() => { imagesRef.current = images }, [images])
 
-  const addImages = useCallback((files) => {
+  // sheetType: 'entry' | 'results'
+  const addImages = useCallback((files, sheetType = 'results') => {
     const newImages = Array.from(files).map((file) => ({
       id: uid(),
       file,
       name: file.name,
       preview: URL.createObjectURL(file),
       status: 'pending',
+      sheetType,
       results: [],
       error: null,
     }))
@@ -50,6 +50,10 @@ export default function App() {
       if (img?.preview?.startsWith('blob:')) URL.revokeObjectURL(img.preview)
       return prev.filter((i) => i.id !== id)
     })
+  }, [])
+
+  const setImageType = useCallback((id, sheetType) => {
+    setImages((prev) => prev.map((i) => (i.id === id ? { ...i, sheetType, results: [], status: 'pending', error: null } : i)))
   }, [])
 
   const transcribeImage = useCallback(async (imageId) => {
@@ -67,7 +71,7 @@ export default function App() {
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType }),
+        body: JSON.stringify({ image: base64, mediaType, sheetType: image.sheetType }),
       })
 
       const data = await res.json().catch(() => ({ error: `Server error ${res.status}` }))
@@ -79,9 +83,7 @@ export default function App() {
       )
     } catch (err) {
       setImages((prev) =>
-        prev.map((i) =>
-          i.id === imageId ? { ...i, status: 'error', error: err.message } : i,
-        ),
+        prev.map((i) => (i.id === imageId ? { ...i, status: 'error', error: err.message } : i)),
       )
     }
   }, [])
@@ -93,15 +95,20 @@ export default function App() {
   }, [transcribeImage])
 
   const updateResults = useCallback((imageId, results) => {
-    setImages((prev) =>
-      prev.map((i) => (i.id === imageId ? { ...i, results } : i)),
-    )
+    setImages((prev) => prev.map((i) => (i.id === imageId ? { ...i, results } : i)))
   }, [])
 
-  const processedImages = images.filter(
-    (i) => i.status === 'done' || i.status === 'error',
-  )
-  const allResults = images.flatMap((i) => i.results)
+  const processedImages = images.filter((i) => i.status === 'done' || i.status === 'error')
+
+  // Separate entry form rows and race results rows for the export panel
+  const entryResults = images
+    .filter((i) => i.sheetType === 'entry' && i.status === 'done')
+    .flatMap((i) => i.results)
+  const raceResults = images
+    .filter((i) => i.sheetType === 'results' && i.status === 'done')
+    .flatMap((i) => i.results)
+
+  const hasAnything = entryResults.length > 0 || raceResults.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -114,6 +121,7 @@ export default function App() {
           images={images}
           onAdd={addImages}
           onRemove={removeImage}
+          onSetType={setImageType}
           onTranscribe={transcribeImage}
           onTranscribeAll={transcribeAll}
         />
@@ -121,9 +129,9 @@ export default function App() {
         {processedImages.length > 0 && (
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-navy">
-              Transcribed Results{' '}
+              Verify{' '}
               <span className="text-slate-400 font-normal text-base">
-                — review and edit before exporting
+                — check against the photo, edit any mistakes
               </span>
             </h2>
             {processedImages.map((img) => (
@@ -131,14 +139,19 @@ export default function App() {
                 key={img.id}
                 image={img}
                 results={img.results}
+                metadata={metadata}
                 onResultsChange={(results) => updateResults(img.id, results)}
               />
             ))}
           </div>
         )}
 
-        {allResults.length > 0 && (
-          <ExportPanel results={allResults} metadata={metadata} />
+        {hasAnything && (
+          <ExportPanel
+            entryResults={entryResults}
+            raceResults={raceResults}
+            metadata={metadata}
+          />
         )}
       </main>
 
@@ -146,7 +159,7 @@ export default function App() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 text-sm text-slate-500 text-center">
           MPYC RaceSync · Free for Mount Pleasant Yacht Club members ·{' '}
           <a
-            href="https://github.com/mpyc/racesync"
+            href="https://github.com/alamarcinek/mpyc-racesync"
             target="_blank"
             rel="noreferrer"
             className="text-navy hover:underline font-medium"
