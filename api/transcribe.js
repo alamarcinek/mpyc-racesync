@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-7',
       max_tokens: 4096,
       messages: [
         {
