@@ -29,15 +29,14 @@ export default function App() {
   const imagesRef = useRef([])
   useEffect(() => { imagesRef.current = images }, [images])
 
-  // sheetType: 'entry' | 'results'
-  const addImages = useCallback((files, sheetType = 'results') => {
+  const addImages = useCallback((files) => {
     const newImages = Array.from(files).map((file) => ({
       id: uid(),
       file,
       name: file.name,
       preview: URL.createObjectURL(file),
       status: 'pending',
-      sheetType,
+      sheetType: null, // detected automatically after transcription
       results: [],
       error: null,
     }))
@@ -50,10 +49,6 @@ export default function App() {
       if (img?.preview?.startsWith('blob:')) URL.revokeObjectURL(img.preview)
       return prev.filter((i) => i.id !== id)
     })
-  }, [])
-
-  const setImageType = useCallback((id, sheetType) => {
-    setImages((prev) => prev.map((i) => (i.id === id ? { ...i, sheetType, results: [], status: 'pending', error: null } : i)))
   }, [])
 
   const transcribeImage = useCallback(async (imageId) => {
@@ -71,15 +66,16 @@ export default function App() {
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType, sheetType: image.sheetType }),
+        body: JSON.stringify({ image: base64, mediaType }),
       })
 
       const data = await res.json().catch(() => ({ error: `Server error ${res.status}` }))
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
 
       const results = (data.results || []).map((r) => ({ id: uid(), ...r }))
+      const sheetType = data.sheetType || 'results'
       setImages((prev) =>
-        prev.map((i) => (i.id === imageId ? { ...i, status: 'done', results } : i)),
+        prev.map((i) => (i.id === imageId ? { ...i, status: 'done', sheetType, results } : i)),
       )
     } catch (err) {
       setImages((prev) =>
@@ -121,7 +117,6 @@ export default function App() {
           images={images}
           onAdd={addImages}
           onRemove={removeImage}
-          onSetType={setImageType}
           onTranscribe={transcribeImage}
           onTranscribeAll={transcribeAll}
         />

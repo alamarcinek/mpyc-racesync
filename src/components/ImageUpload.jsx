@@ -16,39 +16,29 @@ const STATUS_STYLE = {
 }
 
 const TYPE_LABEL = { entry: 'Entry Form', results: 'Race Results' }
-const TYPE_STYLE = {
-  entry: 'bg-purple-100 text-purple-700',
-  results: 'bg-navy-light text-navy',
-}
+const TYPE_STYLE = { entry: 'bg-purple-100 text-purple-700', results: 'bg-navy-light text-navy' }
 
-export default function ImageUpload({ images, onAdd, onRemove, onSetType, onTranscribe, onTranscribeAll }) {
+export default function ImageUpload({ images, onAdd, onRemove, onTranscribe, onTranscribeAll }) {
   const [dragging, setDragging] = useState(false)
-  const [defaultType, setDefaultType] = useState('results')
   const inputRef = useRef(null)
 
-  const handleDrop = useCallback(
-    (e) => {
-      e.preventDefault()
-      setDragging(false)
-      const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
-      if (files.length) onAdd(files, defaultType)
-    },
-    [onAdd, defaultType],
-  )
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    setDragging(false)
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
+    if (files.length) onAdd(files)
+  }, [onAdd])
 
   const handleDragOver = useCallback((e) => { e.preventDefault(); setDragging(true) }, [])
   const handleDragLeave = useCallback((e) => {
     if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false)
   }, [])
 
-  const handleFileSelect = useCallback(
-    (e) => {
-      const files = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'))
-      if (files.length) onAdd(files, defaultType)
-      e.target.value = ''
-    },
-    [onAdd, defaultType],
-  )
+  const handleFileSelect = useCallback((e) => {
+    const files = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'))
+    if (files.length) onAdd(files)
+    e.target.value = ''
+  }, [onAdd])
 
   const pendingCount = images.filter((i) => i.status === 'pending').length
   const processingCount = images.filter((i) => i.status === 'processing').length
@@ -56,25 +46,9 @@ export default function ImageUpload({ images, onAdd, onRemove, onSetType, onTran
   return (
     <div className="card space-y-5">
       <h2 className="section-title mb-0">Upload Sheets</h2>
-
-      {/* Sheet type selector */}
-      <div>
-        <p className="text-sm text-slate-600 mb-2 font-medium">What type of sheet are you uploading?</p>
-        <div className="flex gap-2">
-          <TypeBtn
-            active={defaultType === 'entry'}
-            onClick={() => setDefaultType('entry')}
-            label="Entry Form"
-            desc="Sign-on sheet with competitor details"
-          />
-          <TypeBtn
-            active={defaultType === 'results'}
-            onClick={() => setDefaultType('results')}
-            label="Race Results"
-            desc="Finishing times log"
-          />
-        </div>
-      </div>
+      <p className="text-sm text-slate-500 -mt-3">
+        Entry forms and race results sheets — the app detects the type automatically.
+      </p>
 
       {/* Drop zone */}
       <div
@@ -87,17 +61,13 @@ export default function ImageUpload({ images, onAdd, onRemove, onSetType, onTran
         onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
         aria-label="Upload race sheet images"
         className={[
-          'border-2 border-dashed rounded-xl p-8 sm:p-10 text-center cursor-pointer transition-colors',
-          dragging
-            ? 'border-navy bg-navy-light'
-            : 'border-slate-300 hover:border-navy hover:bg-slate-50',
+          'border-2 border-dashed rounded-xl p-8 sm:p-12 text-center cursor-pointer transition-colors',
+          dragging ? 'border-navy bg-navy-light' : 'border-slate-300 hover:border-navy hover:bg-slate-50',
         ].join(' ')}
       >
         <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} className="sr-only" aria-hidden="true" />
-        <UploadIcon className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-        <p className="text-slate-700 font-semibold">
-          Drop <span className="text-navy">{TYPE_LABEL[defaultType]}</span> images here or tap to select
-        </p>
+        <UploadIcon className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+        <p className="text-slate-700 font-semibold text-lg">Drop images here or tap to select</p>
         <p className="text-slate-400 text-sm mt-1">JPG, PNG, HEIC — multiple files accepted</p>
         {images.some((i) => i.file?.size > 4 * 1024 * 1024) && (
           <p className="text-amber-600 text-xs mt-2">Large images detected — keep under 4 MB for best results</p>
@@ -109,13 +79,7 @@ export default function ImageUpload({ images, onAdd, onRemove, onSetType, onTran
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {images.map((img) => (
-              <Thumbnail
-                key={img.id}
-                img={img}
-                onRemove={onRemove}
-                onSetType={onSetType}
-                onTranscribe={onTranscribe}
-              />
+              <Thumbnail key={img.id} img={img} onRemove={onRemove} onTranscribe={onTranscribe} />
             ))}
           </div>
 
@@ -139,27 +103,9 @@ export default function ImageUpload({ images, onAdd, onRemove, onSetType, onTran
   )
 }
 
-function TypeBtn({ active, onClick, label, desc }) {
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        'flex-1 text-left px-4 py-3 rounded-xl border-2 transition text-sm',
-        active
-          ? 'border-navy bg-navy text-white'
-          : 'border-slate-200 bg-white text-slate-700 hover:border-navy/50',
-      ].join(' ')}
-    >
-      <div className="font-semibold">{label}</div>
-      <div className={`text-xs mt-0.5 ${active ? 'text-white/70' : 'text-slate-400'}`}>{desc}</div>
-    </button>
-  )
-}
-
-function Thumbnail({ img, onRemove, onSetType, onTranscribe }) {
+function Thumbnail({ img, onRemove, onTranscribe }) {
   return (
     <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm flex flex-col">
-      {/* Image preview */}
       <div className="relative aspect-[3/4] bg-slate-100 overflow-hidden">
         <img src={img.preview} alt={img.name} className="w-full h-full object-cover" loading="lazy" />
         {img.status === 'processing' && (
@@ -179,24 +125,15 @@ function Thumbnail({ img, onRemove, onSetType, onTranscribe }) {
         )}
       </div>
 
-      {/* Info + type toggle */}
       <div className="p-2 space-y-1.5 flex-1">
         <p className="text-xs text-slate-600 truncate font-medium" title={img.name}>{img.name}</p>
         <div className="flex items-center gap-1 flex-wrap">
-          <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLE[img.status]}`}>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLE[img.status]}`}>
             {STATUS_LABEL[img.status]}
           </span>
-          {/* Type badge — tap to toggle if still pending */}
-          {img.status === 'pending' ? (
-            <button
-              onClick={() => onSetType(img.id, img.sheetType === 'entry' ? 'results' : 'entry')}
-              title="Tap to switch type"
-              className={`inline-block text-xs px-2 py-0.5 rounded-full font-semibold border border-current/20 ${TYPE_STYLE[img.sheetType]}`}
-            >
-              {TYPE_LABEL[img.sheetType]} ⇄
-            </button>
-          ) : (
-            <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_STYLE[img.sheetType]}`}>
+          {/* Detected type badge — shown after transcription */}
+          {img.sheetType && img.status === 'done' && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_STYLE[img.sheetType]}`}>
               {TYPE_LABEL[img.sheetType]}
             </span>
           )}
@@ -207,18 +144,14 @@ function Thumbnail({ img, onRemove, onSetType, onTranscribe }) {
       </div>
 
       {img.status === 'pending' && (
-        <button
-          onClick={() => onTranscribe(img.id)}
-          className="w-full py-2.5 text-xs font-semibold bg-navy text-white hover:bg-navy-hover transition border-t border-navy/20"
-        >
+        <button onClick={() => onTranscribe(img.id)}
+          className="w-full py-2.5 text-xs font-semibold bg-navy text-white hover:bg-navy-hover transition border-t border-navy/20">
           Transcribe
         </button>
       )}
       {img.status === 'error' && (
-        <button
-          onClick={() => onTranscribe(img.id)}
-          className="w-full py-2.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition border-t border-red-500"
-        >
+        <button onClick={() => onTranscribe(img.id)}
+          className="w-full py-2.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition border-t border-red-500">
           Retry
         </button>
       )}

@@ -1,38 +1,32 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const PROMPT_ENTRY =
-  'You are transcribing a Mount Pleasant Yacht Club Entry Form (sign-on sheet). ' +
-  'The form has columns: Club, Yacht Name, Type of yacht, Sail Size (if applicable), Skipper & Crew, Number (sail number). ' +
-  'Extract ALL completed rows — skip the printed header row and the example row — and return ONLY a JSON array (no markdown, no explanation). ' +
-  'Each object must have: club (string), yacht_name (string), yacht_type (string), sail_size (string), skipper (string), sailno (string — the Number column, keep exactly as written). ' +
-  'If a value is unclear, append [?]. Skip entirely blank rows.';
-
-const PROMPT_RESULTS =
-  'You are transcribing a Mount Pleasant Yacht Club Race Finishing Times sheet. ' +
-  'The printed sheet has columns: Place, Class (sail number), Finishing Time, Skipper. ' +
-  'IMPORTANT: The sheet has pre-printed row numbers (1, 2, 3 ... 33) along the left edge — these are NOT place numbers, ignore them completely. Only read the handwritten Place values inside the table. ' +
-  'A single sheet often contains TWO separate races divided by a wavy zigzag line drawn across several empty rows. ' +
-  'Signs of a second race: (1) a wavy zigzag line through empty rows, (2) the same sail numbers reappear below it. ' +
-  'In the second race the handwritten place numbers reset back to 1. ' +
-  'Extract ALL rows that contain handwritten data (skip blank rows and the zigzag rows) and return ONLY a JSON array (no markdown, no explanation). ' +
-  'Each object must have: ' +
-  'place (integer — from the handwritten Place column, resets to 1 for race_section 2), ' +
-  'sailno (string — keep exactly as written including spaces e.g. "116 033"), ' +
-  'finish_time (string MM:SS — convert "29 10" or "29.10" or "29 : 10" to "29:10"), ' +
-  'skipper (string or empty), ' +
-  'code (string — DNF/DNS/OCS/DSQ/RET or empty), ' +
-  'notes (string — any side annotations or empty), ' +
-  'race_section (integer: 1 for all rows before the zigzag, 2 for all rows after). ' +
-  'If a value is unclear, append [?]. Ignore the zigzag line itself — only use it to assign race_section.';
-
-const PROMPTS = { entry: PROMPT_ENTRY, results: PROMPT_RESULTS };
+const PROMPT =
+  'You are processing a Mount Pleasant Yacht Club paper sheet. ' +
+  'First identify the sheet type from the column headers and content:\n' +
+  '- ENTRY FORM: columns like "Club", "Yacht Name", "Type of yacht", "Skipper & Crew", "Number" — registers competitors\n' +
+  '- RACE RESULTS: columns like "Place", "Class", "Finishing Time" — records finishing order\n\n' +
+  'Return a single JSON object (no markdown, no explanation) with exactly two fields: "sheet_type" and "rows".\n\n' +
+  'If sheet_type is "entry", each row in "rows" must have:\n' +
+  '  club (string), yacht_name (string), yacht_type (string), sail_size (string), skipper (string), sailno (string — the Number column).\n' +
+  '  Skip the printed example row and skip blank rows.\n\n' +
+  'If sheet_type is "results", each row in "rows" must have:\n' +
+  '  place (integer — from the handwritten Place column only; ignore the pre-printed row numbers 1-33 on the left sheet edge),\n' +
+  '  sailno (string, keep spaces e.g. "116 033"),\n' +
+  '  finish_time (string MM:SS — convert "29 10" or "29.10" to "29:10"),\n' +
+  '  skipper (string or empty),\n' +
+  '  code (string — DNF/DNS/OCS/DSQ/RET or empty),\n' +
+  '  notes (string or empty),\n' +
+  '  race_section (integer: 1 for rows before the zigzag line, 2 for rows after).\n' +
+  '  Note: a results sheet often has TWO races separated by a wavy zigzag line through empty rows. ' +
+  '  After the zigzag the same sail numbers reappear with new times. Place numbers reset to 1 in section 2.\n\n' +
+  'If any value is unclear, append [?]. Skip entirely blank rows.';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { image, mediaType, sheetType = 'results' } = req.body || {};
+  const { image, mediaType } = req.body || {};
 
   if (!image || !mediaType) {
     return res.status(400).json({ error: 'Missing required fields: image, mediaType' });
@@ -41,8 +35,6 @@ export default async function handler(req, res) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'Server configuration error: API key not set. Contact the site admin.' });
   }
-
-  const prompt = PROMPTS[sheetType] || PROMPTS.results;
 
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -55,7 +47,7 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-            { type: 'text', text: prompt },
+            { type: 'text', text: PROMPT },
           ],
         },
       ],
@@ -63,18 +55,20 @@ export default async function handler(req, res) {
 
     let text = message.content[0].text.trim();
 
-    // Strip markdown code fences if Claude wrapped the JSON
     if (text.startsWith('```')) {
       text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     }
 
-    const results = JSON.parse(text);
+    const parsed = JSON.parse(text);
 
-    if (!Array.isArray(results)) {
+    if (!parsed.sheet_type || !Array.isArray(parsed.rows)) {
       throw new Error('Unexpected response format from AI');
     }
 
-    return res.status(200).json({ results });
+    return res.status(200).json({
+      sheetType: parsed.sheet_type === 'entry' ? 'entry' : 'results',
+      results: parsed.rows,
+    });
   } catch (err) {
     console.error('Transcription error:', err);
 
