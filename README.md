@@ -96,7 +96,7 @@ mpyc-racesync/
 │   └── components/
 │       ├── Header.jsx       # Top nav bar
 │       ├── TrustSection.jsx # "How it works" + "Why it's safe"
-│       ├── RaceMetadata.jsx # Race number, date, gun time, series
+│       ├── RaceMetadata.jsx # Date and series name inputs
 │       ├── ImageUpload.jsx  # Drag-and-drop upload + thumbnails
 │       ├── ResultsTable.jsx # Inline-editable results table
 │       ├── ExportPanel.jsx  # CSV generation + download
@@ -115,7 +115,7 @@ mpyc-racesync/
 |---|---|
 | Frontend | React 19 + Vite 8 |
 | Styling | Tailwind CSS v4 |
-| AI transcription | Anthropic claude-sonnet-4-20250514 |
+| AI transcription | Anthropic claude-opus-4-7 (chosen for best vision accuracy and highest image resolution — critical for handwriting recognition) |
 | Backend | Vercel serverless function (Node.js) |
 | Hosting | Vercel |
 
