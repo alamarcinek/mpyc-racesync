@@ -19,8 +19,8 @@ function fileToBase64(file) {
   })
 }
 
-// Compute sequential race list across all result images
-function computeRaces(images, baseRaceNo) {
+// Compute sequential race list across all result images, attaching per-race start times
+function computeRaces(images, baseRaceNo, raceStartTimes) {
   const races = []
   let next = baseRaceNo
   for (const img of images.filter((i) => i.sheetType === 'results' && i.status === 'done')) {
@@ -30,7 +30,8 @@ function computeRaces(images, baseRaceNo) {
       ;(bySection[s] = bySection[s] || []).push(row)
     }
     for (const s of Object.keys(bySection).map(Number).sort()) {
-      races.push({ raceno: next++, imageId: img.id, imageName: img.name, section: s, rows: bySection[s] })
+      const key = `${img.id}-${s}`
+      races.push({ raceno: next++, imageId: img.id, imageName: img.name, section: s, rows: bySection[s], startTime: raceStartTimes[key] || '' })
     }
   }
   return races
@@ -45,8 +46,12 @@ export default function App() {
   })
   const [images, setImages] = useState([])
   const [toast, setToast] = useState(null)
+  const [resultType, setResultType] = useState('elapsed')
+  const [raceStartTimes, setRaceStartTimes] = useState({})
   const imagesRef = useRef([])
+  const resultTypeRef = useRef('elapsed')
   useEffect(() => { imagesRef.current = images }, [images])
+  useEffect(() => { resultTypeRef.current = resultType }, [resultType])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -83,7 +88,7 @@ export default function App() {
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType }),
+        body: JSON.stringify({ image: base64, mediaType, resultType: resultTypeRef.current }),
       })
 
       const data = await res.json().catch(() => ({ error: `Server error ${res.status}` }))
@@ -128,8 +133,12 @@ export default function App() {
     setImages((prev) => prev.map((i) => (i.id === imageId ? { ...i, results } : i)))
   }, [])
 
+  const updateRaceStartTime = useCallback((imageId, section, time) => {
+    setRaceStartTimes((prev) => ({ ...prev, [`${imageId}-${section}`]: time }))
+  }, [])
+
   const baseRaceNo = parseInt(metadata.raceNumber, 10) || 1
-  const races = computeRaces(images, baseRaceNo)
+  const races = computeRaces(images, baseRaceNo, raceStartTimes)
 
   const entryImages = images.filter((i) => i.sheetType === 'entry' && i.status === 'done')
   const entryResults = entryImages.flatMap((i) => i.results)
@@ -141,7 +150,12 @@ export default function App() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6 pb-16">
         <TrustSection />
-        <RaceMetadata metadata={metadata} onChange={setMetadata} />
+        <RaceMetadata
+          metadata={metadata}
+          onChange={setMetadata}
+          resultType={resultType}
+          onResultTypeChange={setResultType}
+        />
         <ImageUpload
           images={images}
           onAdd={addImages}
@@ -178,6 +192,9 @@ export default function App() {
                 imageName={race.imageName}
                 rows={race.rows}
                 onRowsChange={(rows) => updateRace(race.imageId, race.section, rows)}
+                resultType={resultType}
+                startTime={race.startTime}
+                onStartTimeChange={(time) => updateRaceStartTime(race.imageId, race.section, time)}
               />
             ))}
           </div>
@@ -188,6 +205,7 @@ export default function App() {
             races={races}
             entryResults={entryResults}
             metadata={metadata}
+            resultType={resultType}
           />
         )}
       </main>

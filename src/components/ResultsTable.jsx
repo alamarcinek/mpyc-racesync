@@ -6,16 +6,27 @@ const EMPTY_RESULTS_ROW = () => ({ id: uid(), place: '', sailno: '', finish_time
 const EMPTY_ENTRY_ROW = () => ({ id: uid(), club: '', yacht_name: '', yacht_type: '', sail_size: '', skipper: '', sailno: '' })
 
 // Single export: handles both entry and results based on sheetType prop
-export default function RaceTable({ sheetType, raceno, imageName, rows, onRowsChange, error }) {
+export default function RaceTable({ sheetType, raceno, imageName, rows, onRowsChange, error, resultType = 'elapsed', startTime = '', onStartTimeChange }) {
   if (sheetType === 'entry') {
     return <EntryTable imageName={imageName} rows={rows} onRowsChange={onRowsChange} error={error} />
   }
-  return <ResultsTable raceno={raceno} imageName={imageName} rows={rows} onRowsChange={onRowsChange} />
+  return (
+    <ResultsTable
+      raceno={raceno}
+      imageName={imageName}
+      rows={rows}
+      onRowsChange={onRowsChange}
+      resultType={resultType}
+      startTime={startTime}
+      onStartTimeChange={onStartTimeChange}
+    />
+  )
 }
 
 // ─── Race Results Table ────────────────────────────────────────────────────────
 
-function ResultsTable({ raceno, imageName, rows, onRowsChange }) {
+function ResultsTable({ raceno, imageName, rows, onRowsChange, resultType, startTime, onStartTimeChange }) {
+  const isWallClock = resultType === 'wallclock'
   const addRow = () => onRowsChange([...rows, EMPTY_RESULTS_ROW()])
 
   const deleteRow = (id) => onRowsChange(rows.filter((r) => r.id !== id))
@@ -45,7 +56,7 @@ function ResultsTable({ raceno, imageName, rows, onRowsChange }) {
     <div className="card">
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-4 flex-wrap">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-white text-sm px-3 py-1 bg-navy rounded-lg">Race {raceno}</span>
             <span className="text-xs text-slate-400 font-mono truncate max-w-[180px] sm:max-w-none" title={imageName}>
@@ -62,6 +73,18 @@ function ResultsTable({ raceno, imageName, rows, onRowsChange }) {
             )}
           </p>
         </div>
+        {isWallClock && (
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-sm font-medium text-slate-600 whitespace-nowrap">Start time</label>
+            <input
+              type="text"
+              value={startTime}
+              onChange={(e) => onStartTimeChange(e.target.value)}
+              placeholder="13:00"
+              className="w-24 px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-navy/40 focus:border-navy transition"
+            />
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -69,7 +92,7 @@ function ResultsTable({ raceno, imageName, rows, onRowsChange }) {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-y border-slate-200">
-              {['Place', 'Sail No', 'Finishing Time', 'Skipper', 'Code', 'Notes', ''].map((h) => (
+              {['Place', 'Sail No', isWallClock ? 'Finish Time' : 'Elapsed', 'Skipper', 'Code', 'Notes', ''].map((h) => (
                 <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -92,7 +115,7 @@ function ResultsTable({ raceno, imageName, rows, onRowsChange }) {
                         value={hasCode ? '' : (row.finish_time ?? '')}
                         onChange={(e) => updateCell(row.id, 'finish_time', e.target.value)}
                         disabled={hasCode}
-                        placeholder={hasCode ? '—' : '26:17'}
+                        placeholder={hasCode ? '—' : isWallClock ? '14:02' : '26:17'}
                         className={[
                           'w-28 bg-transparent border border-transparent rounded px-1.5 py-1.5',
                           'focus:outline-none focus:border-navy/40 focus:bg-white focus:ring-1 focus:ring-navy/30',

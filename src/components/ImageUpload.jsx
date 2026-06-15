@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react'
-import { UploadIcon, SparklesIcon } from './icons'
+import { UploadIcon, SparklesIcon, CameraIcon } from './icons'
 
 const STATUS_LABEL = {
   pending: 'Ready',
@@ -21,6 +21,7 @@ const TYPE_STYLE = { entry: 'bg-purple-100 text-purple-700', results: 'bg-navy-l
 export default function ImageUpload({ images, onAdd, onRemove, onTranscribe, onTranscribeAll }) {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
+  const cameraRef = useRef(null)
 
   const handleDrop = useCallback((e) => {
     e.preventDefault()
@@ -35,6 +36,12 @@ export default function ImageUpload({ images, onAdd, onRemove, onTranscribe, onT
   }, [])
 
   const handleFileSelect = useCallback((e) => {
+    const files = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'))
+    if (files.length) onAdd(files)
+    e.target.value = ''
+  }, [onAdd])
+
+  const handleCameraCapture = useCallback((e) => {
     const files = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'))
     if (files.length) onAdd(files)
     e.target.value = ''
@@ -73,6 +80,22 @@ export default function ImageUpload({ images, onAdd, onRemove, onTranscribe, onT
           <p className="text-amber-600 text-xs mt-2">Large images detected — keep under 4 MB for best results</p>
         )}
       </div>
+
+      {/* Camera capture — goes straight to camera on mobile */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs text-slate-400 font-medium">or</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleCameraCapture} className="sr-only" aria-hidden="true" />
+      <button
+        type="button"
+        onClick={() => cameraRef.current?.click()}
+        className="btn-secondary w-full"
+      >
+        <CameraIcon className="w-5 h-5" />
+        Take Photo
+      </button>
 
       {/* Thumbnails */}
       {images.length > 0 && (

@@ -12,19 +12,20 @@ const csvField = (v) => {
 
 // ─── CSV generators ────────────────────────────────────────────────────────────
 
-// races = [{ raceno, rows }] — already computed sequentially in App.jsx
-function buildResultsCSV(races, metadata) {
+function csvHeader(metadata, label) {
   const date = metadata.date || new Date().toISOString().slice(0, 10)
   const event = [metadata.seriesName, metadata.raceNumber ? `Race ${metadata.raceNumber}` : ''].filter(Boolean).join(' · ') || 'MPYC'
-
-  const lines = [
-    `; MPYC Race Results`,
+  return [
+    `; MPYC Race Results (${label})`,
     `; Event: ${event}`,
     `; Date: ${date}`,
     `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} by MPYC RaceSync`,
-    `raceno,sailno,elapsed,code`,
   ]
+}
 
+// races = [{ raceno, rows }] — already computed sequentially in App.jsx
+function buildResultsCSV(races, metadata) {
+  const lines = [...csvHeader(metadata, 'Elapsed time'), 'raceno,sailno,elapsed,code']
   for (const race of races) {
     lines.push(`; ---- Race ${race.raceno} ----`)
     for (const r of race.rows) {
@@ -35,7 +36,27 @@ function buildResultsCSV(races, metadata) {
       lines.push(`${race.raceno},${sn},${elapsed},${code}`)
     }
   }
+  return lines.join('\n')
+}
 
+// races = [{ raceno, startTime, rows }]
+function buildWallClockCSV(races, metadata) {
+  const lines = [
+    ...csvHeader(metadata, 'Wall clock time'),
+    '; start = race start time  ·  finish = competitor finish time  (HH:MM or HH:MM:SS)',
+    'raceno,sailno,start,finish,code',
+  ]
+  for (const race of races) {
+    lines.push(`; ---- Race ${race.raceno} ----`)
+    for (const r of race.rows) {
+      const sn = csvField(r.sailno)
+      if (!sn) continue
+      const code = strip(r.code || '')
+      const finish = code ? '' : strip(r.finish_time || '')
+      const start = strip(race.startTime || '')
+      lines.push(`${race.raceno},${sn},${start},${finish},${code}`)
+    }
+  }
   return lines.join('\n')
 }
 
@@ -85,7 +106,7 @@ function downloadCSV(content, filename) {
 
 // ─── Validation ────────────────────────────────────────────────────────────────
 
-function validate(races) {
+function validate(races, resultType) {
   const warnings = []
   const allRows = races.flatMap((race) => race.rows)
   const bothTimeAndCode = allRows.filter((r) => strip(r.finish_time) && strip(r.code))
@@ -95,17 +116,29 @@ function validate(races) {
       `Sailwave expects one or the other. Sail numbers: ${bothTimeAndCode.map((r) => strip(r.sailno)).join(', ')}.`
     )
   }
+  if (resultType === 'wallclock') {
+    const racesWithResults = races.filter((r) => r.rows.some((row) => strip(row.sailno)))
+    const racesWithoutStart = racesWithResults.filter((r) => !strip(r.startTime))
+    if (racesWithoutStart.length > 0) {
+      warnings.push(
+        `Race${racesWithoutStart.length > 1 ? 's' : ''} ${racesWithoutStart.map((r) => r.raceno).join(', ')} ` +
+        `${racesWithoutStart.length > 1 ? 'are' : 'is'} missing a start time. ` +
+        `Enter the start time in the results table${racesWithoutStart.length > 1 ? 's' : ''} above.`
+      )
+    }
+  }
   return warnings
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-// races = [{ raceno, rows }] from App.jsx computeRaces()
-export default function ExportPanel({ races, entryResults, metadata }) {
+// races = [{ raceno, startTime, rows }] from App.jsx computeRaces()
+export default function ExportPanel({ races, entryResults, metadata, resultType }) {
   const [showResultsPreview, setShowResultsPreview] = useState(false)
   const [showCompetitorsPreview, setShowCompetitorsPreview] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
 
+  const isWallClock = resultType === 'wallclock'
   const date = metadata.date || new Date().toISOString().slice(0, 10)
   const allRaceRows = races.flatMap((r) => r.rows)
 
@@ -115,10 +148,10 @@ export default function ExportPanel({ races, entryResults, metadata }) {
   const resultsFile = `MPYC_${raceLabel}_Results_${date}.csv`
   const competitorsFile = `MPYC_Competitors_${date}.csv`
 
-  const resultsCSV = buildResultsCSV(races, metadata)
+  const resultsCSV = isWallClock ? buildWallClockCSV(races, metadata) : buildResultsCSV(races, metadata)
   const competitorsCSV = buildCompetitorsCSV(entryResults, allRaceRows, metadata)
 
-  const warnings = validate(races)
+  const warnings = validate(races, resultType)
 
   const uniqueBoats = new Set(allRaceRows.map((r) => strip(r.sailno)).filter(Boolean)).size
 
@@ -208,6 +241,11 @@ export default function ExportPanel({ races, entryResults, metadata }) {
             <p>In Sailwave: <span className="font-mono bg-slate-100 px-1 rounded">File → Import Competitor List</span> → select <code className="bg-slate-100 px-1 rounded">{competitorsFile}</code></p>
             <p className="font-medium text-slate-700 pt-1">Step 2 — Import results</p>
             <p>In Sailwave: <span className="font-mono bg-slate-100 px-1 rounded">File → Import Race Results</span> → select <code className="bg-slate-100 px-1 rounded">{resultsFile}</code></p>
+            {isWallClock && (
+              <p className="text-slate-600">
+                In Sailwave's import wizard, map the <code className="bg-slate-100 px-1 rounded">start</code> column to <strong>Start time</strong> and <code className="bg-slate-100 px-1 rounded">finish</code> to <strong>Finish time</strong>.
+              </p>
+            )}
             <p className="text-slate-500 text-xs pt-1">Sailwave will match results to competitors by sail number. Check the scoring view after import.</p>
           </div>
         )}
