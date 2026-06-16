@@ -27,7 +27,6 @@ function csvHeader(metadata, label) {
 function buildResultsCSV(races, metadata) {
   const lines = [...csvHeader(metadata, 'Elapsed time'), 'raceno,sailno,elapsed,code']
   for (const race of races) {
-    lines.push(`; ---- Race ${race.raceno} ----`)
     for (const r of race.rows) {
       const sn = csvField(r.sailno)
       if (!sn) continue
@@ -47,7 +46,6 @@ function buildWallClockCSV(races, metadata) {
     'raceno,sailno,start,finish,code',
   ]
   for (const race of races) {
-    lines.push(`; ---- Race ${race.raceno} ----`)
     for (const r of race.rows) {
       const sn = csvField(r.sailno)
       if (!sn) continue
