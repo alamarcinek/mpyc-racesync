@@ -110,7 +110,7 @@ function ResultsTable({ raceno, imageName, rows, onRowsChange, resultType, start
                     <EditCell value={row.place}   onChange={(v) => updateCell(row.id, 'place', v)}   width="w-14" />
                     <EditCell value={row.sailno}  onChange={(v) => updateCell(row.id, 'sailno', v)}  width="w-28" />
                     {/* Finish time — disabled when code is set */}
-                    <td className={`px-2 py-1.5 ${isUncertain(row.finish_time) ? 'bg-yellow-50' : hasCode ? 'bg-slate-50' : ''}`}>
+                    <td className={`px-2 py-1.5 ${isUncertain(row.finish_time) ? 'bg-yellow-200' : hasCode ? 'bg-slate-50' : ''}`}>
                       <input
                         value={hasCode ? '' : (row.finish_time ?? '')}
                         onChange={(e) => updateCell(row.id, 'finish_time', e.target.value)}
@@ -127,7 +127,7 @@ function ResultsTable({ raceno, imageName, rows, onRowsChange, resultType, start
                     </td>
                     <EditCell value={row.skipper} onChange={(v) => updateCell(row.id, 'skipper', v)} width="w-32" wide />
                     {/* Code dropdown */}
-                    <td className={`px-2 py-1.5 ${isUncertain(row.code) ? 'bg-yellow-50' : ''}`}>
+                    <td className={`px-2 py-1.5 ${isUncertain(row.code) ? 'bg-yellow-200' : ''}`}>
                       <select
                         value={row.code}
                         onChange={(e) => updateCell(row.id, 'code', e.target.value)}
@@ -231,7 +231,7 @@ function EntryTable({ imageName, rows, onRowsChange, error }) {
 function EditCell({ value, onChange, width = 'w-24', wide = false, placeholder = '' }) {
   const uncertain = isUncertain(value)
   return (
-    <td className={`px-2 py-1.5 ${uncertain ? 'bg-yellow-50' : ''}`}>
+    <td className={`px-2 py-1.5 ${uncertain ? 'bg-yellow-200' : ''}`}>
       <input
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
