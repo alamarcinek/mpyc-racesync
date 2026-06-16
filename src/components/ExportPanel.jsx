@@ -12,20 +12,9 @@ const csvField = (v) => {
 
 // ─── CSV generators ────────────────────────────────────────────────────────────
 
-function csvHeader(metadata, label) {
-  const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const event = [metadata.seriesName, metadata.raceNumber ? `Race ${metadata.raceNumber}` : ''].filter(Boolean).join(' · ') || 'MPYC'
-  return [
-    `; MPYC Race Results (${label})`,
-    `; Event: ${event}`,
-    `; Date: ${date}`,
-    `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} by MPYC RaceSync`,
-  ]
-}
-
 // races = [{ raceno, rows }] — already computed sequentially in App.jsx
 function buildResultsCSV(races, metadata) {
-  const lines = [...csvHeader(metadata, 'Elapsed time'), 'raceno,sailno,elapsed,code']
+  const lines = ['raceno,sailno,elapsed,code']
   for (const race of races) {
     for (const r of race.rows) {
       const sn = csvField(r.sailno)
@@ -40,11 +29,7 @@ function buildResultsCSV(races, metadata) {
 
 // races = [{ raceno, startTime, rows }]
 function buildWallClockCSV(races, metadata) {
-  const lines = [
-    ...csvHeader(metadata, 'Wall clock time'),
-    '; start = race start time  ·  finish = competitor finish time  (HH:MM or HH:MM:SS)',
-    'raceno,sailno,start,finish,code',
-  ]
+  const lines = ['raceno,sailno,start,finish,code']
   for (const race of races) {
     for (const r of race.rows) {
       const sn = csvField(r.sailno)
@@ -59,16 +44,7 @@ function buildWallClockCSV(races, metadata) {
 }
 
 function buildCompetitorsCSV(entryResults, raceResults, metadata) {
-  const date = metadata.date || new Date().toISOString().slice(0, 10)
-  const event = metadata.seriesName || 'MPYC'
-
-  const lines = [
-    `; MPYC Competitor List`,
-    `; Event: ${event}`,
-    `; Date: ${date}`,
-    `; Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} by MPYC RaceSync`,
-    `SailNo,HelmName,Class,Club`,
-  ]
+  const lines = ['SailNo,HelmName,Class,Club']
 
   if (entryResults.length > 0) {
     for (const r of entryResults) {
