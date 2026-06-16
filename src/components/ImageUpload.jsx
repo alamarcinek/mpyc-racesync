@@ -119,7 +119,7 @@ function Thumbnail({ img, onRemove, onTranscribe }) {
           <button
             onClick={() => onRemove(img.id)}
             aria-label={`Remove ${img.name}`}
-            className="absolute top-2 right-2 w-7 h-7 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition hover:bg-black/75 text-base leading-none"
+            className="absolute top-2 right-2 w-7 h-7 bg-black/50 text-white rounded-full flex items-center justify-center transition hover:bg-black/75 text-base leading-none"
           >
             ×
           </button>
