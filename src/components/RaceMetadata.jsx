@@ -30,8 +30,8 @@ export default function RaceMetadata({ metadata, onChange, resultType, onResultT
         </div>
         <p className="text-xs text-slate-400 mt-2">
           {resultType === 'elapsed'
-            ? 'Sheet shows time since the start gun — e.g. 45:23'
-            : 'Sheet shows actual clock times — e.g. 14:02. Enter the race start time in each results table below.'}
+            ? 'Auto-detected from sheet, or set manually. Times are elapsed since the start gun — e.g. 45:23'
+            : 'Auto-detected from sheet, or set manually. Times are actual clock times — e.g. 19:03. Start times are auto-filled from the sheet where found.'}
         </p>
       </div>
 

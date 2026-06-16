@@ -49,9 +49,7 @@ export default function App() {
   const [resultType, setResultType] = useState('elapsed')
   const [raceStartTimes, setRaceStartTimes] = useState({})
   const imagesRef = useRef([])
-  const resultTypeRef = useRef('elapsed')
   useEffect(() => { imagesRef.current = images }, [images])
-  useEffect(() => { resultTypeRef.current = resultType }, [resultType])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -88,7 +86,7 @@ export default function App() {
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType, resultType: resultTypeRef.current }),
+        body: JSON.stringify({ image: base64, mediaType }),
       })
 
       const data = await res.json().catch(() => ({ error: `Server error ${res.status}` }))
@@ -110,6 +108,27 @@ export default function App() {
       setImages((prev) =>
         prev.map((i) => (i.id === imageId ? { ...i, status: 'done', sheetType: data.sheetType || 'results', results } : i)),
       )
+
+      // Auto-detect result type from the sheet
+      if (data.resultType === 'wallclock' || data.resultType === 'elapsed') {
+        setResultType(data.resultType)
+        if (data.resultType === 'wallclock') {
+          showToast('Wall clock times detected')
+        }
+      }
+
+      // Auto-populate start times found on the sheet
+      if (data.raceStartTimes && Object.keys(data.raceStartTimes).length > 0) {
+        setRaceStartTimes((prev) => {
+          const updates = {}
+          for (const [section, time] of Object.entries(data.raceStartTimes)) {
+            updates[`${imageId}-${section}`] = time
+          }
+          return { ...prev, ...updates }
+        })
+        const count = Object.keys(data.raceStartTimes).length
+        showToast(`Start time${count > 1 ? 's' : ''} auto-filled from sheet`)
+      }
     } catch (err) {
       setImages((prev) => prev.map((i) => (i.id === imageId ? { ...i, status: 'error', error: err.message } : i)))
     }
