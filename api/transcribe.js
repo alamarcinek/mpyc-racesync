@@ -24,7 +24,11 @@ const SHARED_RESULTS_FIELDS =
   '  (1) blank/empty rows creating a visual gap, (2) a wavy or zigzag line drawn across empty rows, ' +
   '  (3) the same sail numbers reappear below with completely different finishing times. ' +
   '  Any of these signals means subsequent rows belong to race_section 2.\n\n' +
-  'If any value is unclear, append [?]. Skip entirely blank rows.';
+  'UNCERTAINTY RULE: If ANY character in a value is hard to read, ambiguous, or could be more than one thing, ' +
+  'append [?] to that value (e.g. "47:2[?]" if the last digit is unclear, "567[?]" if the sail number is smudged). ' +
+  'Be generous with [?] — it is far better to flag too many values than to silently guess wrong. ' +
+  'A race officer will review and correct every [?] before the data is used. ' +
+  'Skip entirely blank rows.';
 
 const ELAPSED_PROMPT =
   SHARED_HEADER +
